@@ -1,0 +1,12 @@
+{% extends 'layout.html'%}
+
+{% block body %}
+    <div class="container-fluid">
+        <h1 class="text-center">ARTICLES</h1>
+        <ul class = "list-group">
+        {% for article in articles%}
+            <li class = " list-group-item"><a href= "article/{{article.id}}">{{article.title}}</a></li>
+        {% endfor %}
+    </div>
+
+{% endblock %}
