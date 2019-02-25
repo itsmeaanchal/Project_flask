@@ -1,12 +1,18 @@
 from flask import Flask , render_template,flash, redirect, url_for, session,logging,request
 import pymysql
+import pymysql.cursors
 from flask_wtf import Form
 from wtforms import TextField
-from wtforms import StringField,TextAreaField,PasswordField ,validators
+from wtforms import StringField , TextAreaField , PasswordField ,validators
 from passlib.hash import sha256_crypt
 import data
 from functools import wraps
 
+# Global Variables
+global __sql_cursor__
+global __sql_db__
+
+__sql_db__ = None
 
 app = Flask(__name__)
 Articles = data.articles
@@ -17,10 +23,9 @@ app.config["mysql_host"] = 'localhost'
 app.config["mysql_user"] = 'root'
 app.config["mysql_password"] = ''
 app.config["mysql_db"] = 'myflaskapp'
-
-mysql = pymysql.connect(app)
-
-
+# Open database connection
+__sql_db__ =  pymysql.connect(host="localhost",user="root",passwd="",database="myflaskapp",use_unicode=True, charset='utf8mb4',cursorclass=pymysql.cursors.DictCursor)
+__sql_cursor__ = __sql_db__.cursor()
 #home_page
 @app.route('/')
 def index():
@@ -54,7 +59,8 @@ class RegisterForm(Form):
 #route register
 @app.route('/register.html')
 def register():
-    mysql = pymysql.connect(app)
+    global __sql_cursor__
+    global __sql_db__
     form = RegisterForm(request.form)
     if request.method == 'POST' and form.validate():
         name = form.name.data
@@ -62,38 +68,37 @@ def register():
         username =  form.username.data
         password = sha256_crypt.encrypt(str(form.password.data))
 
-    #create cursor
-    cur = mysql.connection.cursor()
-    sql = "INSERT INTO users (%s) VALUES %r;" % (name,email,username,password)
-    cur.execute(sql)
+        #create cursor
+        sql = "INSERT INTO users(name,email,username,password) VALUES (%s,%s,%s,%s)",(name,email,username,password)
+        __sql_cursor__.execute(sql)
 
-    #commit to db 
-    mysql.connection.commit()
-    #close conn
-    cur.close()
-    #flask flash msg
-    flash('You are now registered and can log in','Successs')
-#redirect
-redirect(url_for('login'))
+
+        #commit to db 
+        __sql_db__.commit()
+        #close conn
+        __sql_db__.close()
+        #flask flash msg
+        flash('You are now registered and can log in','Successs')
+    #redirect
+    redirect(url_for('login'))
 
 #route LOGIN
-@app.route('/login.html',method = ['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    mysql = pymysql.connect(app)
+    global __sql_cursor__
+    global __sql_db__
+    #mysql = pymysql.connect(app)
     
     if request.method == 'POST' :
         username =  request.form['username']
         password_c =  request.form['password']
 
-    #create cursor
-    cur = mysql.connection.cursor()
-
     #Get user by username
     sql = "SELECT * FROM users WHERE username = %", [username]
-    result = cur.execute(sql)
+    result = __sql_cursor__.execute(sql)
     if result > 0:
         #Get Stored hash
-        data = cur.fetchone()
+        data =__sql_cursor__.fetchone()
         password = data['password']
 
         #compare password
@@ -114,13 +119,13 @@ def login():
     return render_template('login.html')
 
     #commit to db 
-    mysql.connection.commit()
+    __sql_db__.commit()
     #close conn
-    cur.close()
+    __sql_db__.close()
     #flask flash msg
     flash('You have logged in','Successs')
-#redirect
-redirect(url_for('login'))
+    #redirect
+    redirect(url_for('login'))
 
 
 # wrapper 
